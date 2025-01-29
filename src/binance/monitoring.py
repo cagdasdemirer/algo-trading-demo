@@ -15,10 +15,11 @@ signals = Counter(
 
 # System Metrics
 latency = Histogram(
-    'app_latency_seconds',
+    'operation_latency_seconds',
     'Latency of key operations',
     ['operation']
 )
+
 
 errors = Counter(
     'app_errors_total',

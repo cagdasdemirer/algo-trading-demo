@@ -4,6 +4,7 @@ import websockets
 import asyncio
 from fastapi.websockets import WebSocketDisconnect
 from src.binance.kafka import publish_price_update
+from src.binance.monitoring import errors
 from src.config import get_settings
 
 
@@ -24,5 +25,6 @@ async def binance_websocket():
                     data = json.loads(data)
                     await publish_price_update(data['k']['c'])
         except (WebSocketDisconnect, ConnectionError):
+            errors.labels(type='binance_websocket').inc()
             logger.error("Connection error. Retrying...")
             await asyncio.sleep(5)

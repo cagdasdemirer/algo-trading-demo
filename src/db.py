@@ -2,6 +2,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
 import logging
 import asyncio
+
+from src.binance.monitoring import errors
 from src.config import get_settings
 
 settings = get_settings()
@@ -34,6 +36,7 @@ class MongoDBSessionManager:
                 logger.info("MongoDB connection established.")
                 return
             except Exception as e:
+                errors.labels(type='db_connect').inc()
                 logger.error(f"Connection attempt {attempt + 1} failed: {e}")
                 self.client = None  # Reset client for clean retries
                 if attempt < retries - 1:

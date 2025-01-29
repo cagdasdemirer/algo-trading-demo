@@ -1,12 +1,16 @@
 import asyncio
 from contextlib import asynccontextmanager
+
+import psutil
 import uvicorn
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.binance import monitoring
 from src.binance.cache import get_redis, redis_pool
 from src.binance.kafka import consume_price_updates, consume_signals
+from src.binance.monitoring import errors
 from src.binance.router import binance_router
 from src.binance.websocket import binance_websocket
 from src.config import get_settings
@@ -44,9 +48,13 @@ async def lifespan(app: FastAPI):
 
         tasks.extend([kafka_price_task, kafka_signal_task])
         logger.info("Kafka consumers started")
-        yield
 
+        # 6. Start background task for system resource monitoring
+        monitor_task = asyncio.create_task(monitor_system_resources())
+        tasks.append(monitor_task)
+        yield
     except Exception as e:
+        errors.labels(type='startup').inc()
         logger.error(f"Startup failed: {e}")
         raise
     finally:
@@ -65,6 +73,18 @@ async def lifespan(app: FastAPI):
         logger.info("Database closed")
         await redis_pool.disconnect()
         logger.info("Redis pool closed")
+
+
+async def monitor_system_resources():
+    while True:
+        # Get CPU usage (as a percentage)
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory_info = psutil.virtual_memory()
+
+        monitoring.cpu_usage.set(cpu_percent)  # Update the CPU usage gauge
+        monitoring.memory_usage.set(memory_info.used)  # Update memory usage in bytes
+
+        await asyncio.sleep(60)
 app = FastAPI(
     lifespan=lifespan,
     title = settings.app.name,
@@ -75,8 +95,12 @@ app = FastAPI(
     docs_url = "/",
 )
 
-# Prometheus metrics
-Instrumentator().instrument(app).expose(app)
+# Initialize Prometheus
+prom = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_instrument_requests_inprogress=True
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,7 +110,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(binance_router)
+api_prefix = "/api/v1"
+app.include_router(prefix=api_prefix, router=binance_router)
+prom.expose(app, endpoint=api_prefix+"/metrics/prometheus")
+
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -49,16 +49,3 @@ async def consume_signals(db: AsyncIOMotorDatabase):
     except Exception as e:
         errors.labels(type='kafka_signals').inc()
         logger.error(f"Signal consumer failed: {e}")
-
-
-async def get_signal_from_queue():
-    consumer = AIOKafkaConsumer(
-        "signals",
-        bootstrap_servers=settings.kafka.bootstrap_servers,
-    )
-    await consumer.start()
-    try:
-        async for msg in consumer:
-            yield msg.value.decode()
-    finally:
-        await consumer.stop()

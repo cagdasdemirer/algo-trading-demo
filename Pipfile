@@ -16,6 +16,7 @@ prometheus-client = "*"
 tenacity = "*"
 prometheus-fastapi-instrumentator = "*"
 uvloop = "*"
+psutil = "*"
 
 [dev-packages]
 

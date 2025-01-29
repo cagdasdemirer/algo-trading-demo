@@ -6,6 +6,8 @@ import redis.asyncio as redis
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from redis import RedisError
 
+from src.binance.monitoring import errors
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +21,7 @@ async def save_price_update_to_db(db: AsyncIOMotorDatabase, price: float):
         })
         logger.info(f"Price saved to db: {price}")
     except Exception as e:
+        errors.labels(type='save_price_update_to_db').inc()
         logger.error(f"Price save to db failed: {e}")
 
 
@@ -36,6 +39,7 @@ async def save_order_to_db(db: AsyncIOMotorDatabase, order_data: dict):
         )
         logger.info(f"Order saved to db with id: {order_data['id']}")
     except Exception as e:
+        errors.labels(type='save_order_to_db').inc()
         logger.error(f"Order save to db failed: {e}")
 
 
@@ -48,6 +52,7 @@ async def update_redis_window(r: redis.Redis, price: float):
             await pipe.execute()
         logger.info("Redis window updated")
     except RedisError as e:
+        errors.labels(type='update_redis_window').inc()
         logger.error(f"Redis update failed: {e}")
 
 
@@ -84,6 +89,7 @@ async def check_crossover(r: redis.Redis, price: float) -> Union[str, None]:
             logger.info(f"Signal detected: {signal}")
             await publish_signal(signal)
     except Exception as e:
+        errors.labels(type='check_crossover').inc()
         logger.error(f"Crossover check failed: {e}")
         return None
 
@@ -98,6 +104,7 @@ async def calculate_sma(window: int, r: redis.Redis) -> Union[float, None]:
         return sum(float(price) for _, price in price_values) / window
 
     except RedisError as e:
+        errors.labels(type='calculate_sma').inc()
         logger.error(f"SMA calculation failed: {e}")
         return None
 
@@ -116,6 +123,7 @@ async def store_sma_state(sma50: float, sma200: float, r: redis.Redis):
     try:
         await r.hset("sma_state", mapping={"sma50": sma50, "sma200": sma200})
     except RedisError as e:
+        errors.labels(type='store_sma_state').inc()
         logger.error(f"State save failed: {e}")
 
 
@@ -124,5 +132,6 @@ async def get_previous_sma(r: redis.Redis):
         values = await r.hmget("sma_state", ["sma50", "sma200"])
         return float(values[0] if values[0] else 0) or None, float(values[1] if values[1] else 0) or None
     except RedisError as e:
+        errors.labels(type='get_previous_sma').inc()
         logger.error(f"State load failed: {e}")
         return None, None
