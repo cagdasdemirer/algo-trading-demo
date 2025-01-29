@@ -1,5 +1,5 @@
 from typing import Annotated
-import redis
+import redis.asyncio as redis
 from fastapi import Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from src.binance.cache import get_redis

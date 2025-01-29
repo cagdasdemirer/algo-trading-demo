@@ -47,7 +47,7 @@ class DatabaseSettings(BaseSettings):
 class BinanceSettings(BaseSettings):
     api_key: str
     secret_key: str
-    websocket_uri: str
+    websocket_stream: str
 
     model_config = SettingsConfigDict(env_prefix="BINANCE_")
 

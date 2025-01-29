@@ -3,17 +3,18 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
+
+from src.binance.cache import get_redis, redis_pool
 from src.binance.kafka import consume_price_updates, consume_signals
 from src.binance.router import binance_router
 from src.binance.websocket import binance_websocket
 from src.config import get_settings
-from src.db import sessionmanager
+from src.db import sessionmanager, get_db
 import logging
-from src.dependencies import MongoDBDep, RedisDep
 
 settings = get_settings()
 
-logging.basicConfig(level=settings.app.log_level)
+logging.basicConfig(level=settings.app.log_level, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -29,9 +30,16 @@ async def lifespan(app: FastAPI):
         ws_task = asyncio.create_task(binance_websocket())
         tasks.append(ws_task)
 
-        # 3. Start Kafka consumers
-        kafka_price_task = asyncio.create_task(consume_price_updates(MongoDBDep, RedisDep))
-        kafka_signal_task = asyncio.create_task(consume_signals(MongoDBDep))
+        # 3. Prepare connections
+        r = await get_redis()
+        db = await get_db()
+
+        # 4. Clear cache
+        await r.flushdb()
+
+        # 5. Start Kafka consumers
+        kafka_price_task = asyncio.create_task(consume_price_updates(db=db, r=r))
+        kafka_signal_task = asyncio.create_task(consume_signals(db=db))
 
         tasks.extend([kafka_price_task, kafka_signal_task])
         logger.info("Kafka consumers started")
@@ -54,6 +62,8 @@ async def lifespan(app: FastAPI):
 
         await sessionmanager.close()
         logger.info("Database closed")
+        await redis_pool.disconnect()
+        logger.info("Redis pool closed")
 app = FastAPI(lifespan=lifespan)
 # Prometheus metrics
 Instrumentator().instrument(app).expose(app)
@@ -65,5 +75,6 @@ if __name__ == "__main__":
         "main:app",
         host=settings.app.host,
         port=settings.app.port,
-        reload=True,
+        workers=4,
+        reload=False,
     )
