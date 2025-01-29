@@ -15,6 +15,7 @@ aiokafka = "*"
 prometheus-client = "*"
 tenacity = "*"
 prometheus-fastapi-instrumentator = "*"
+uvloop = "*"
 
 [dev-packages]
 
