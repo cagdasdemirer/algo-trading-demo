@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.binance.cache import get_redis, redis_pool
 from src.binance.kafka import consume_price_updates, consume_signals
@@ -64,9 +65,26 @@ async def lifespan(app: FastAPI):
         logger.info("Database closed")
         await redis_pool.disconnect()
         logger.info("Redis pool closed")
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title = settings.app.name,
+    version = settings.app.version,
+    contact = {"name": settings.admin.name, "email": settings.admin.email},
+    swagger_ui_parameters = {"defaultModelsExpandDepth": -1},
+    description = "This API provides insights on Algorithmic Trading Signals and Price Updates for Binance.",
+    docs_url = "/",
+)
+
 # Prometheus metrics
 Instrumentator().instrument(app).expose(app)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(binance_router)
 
