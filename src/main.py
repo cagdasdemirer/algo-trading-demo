@@ -120,6 +120,5 @@ if __name__ == "__main__":
         "main:app",
         host=settings.app.host,
         port=settings.app.port,
-        workers=4,
         reload=False,
     )
