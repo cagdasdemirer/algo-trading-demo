@@ -1,4 +1,5 @@
 import logging
+from asyncio import CancelledError, sleep
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaConnectionError
 from fastapi import APIRouter
@@ -27,9 +28,13 @@ async def health_check(db: MongoDBDep, r: RedisDep):
 
         consumer = AIOKafkaConsumer(bootstrap_servers=settings.kafka.bootstrap_servers)
         await consumer.start()
+
+        # small delay to ensure Kafka consumer is ready
+        await sleep(0.2)
+
         await consumer.stop()
 
         return {"status": "OK"}
-    except (RedisError, KafkaConnectionError, PyMongoError) as e:
+    except (RedisError, KafkaConnectionError, PyMongoError, CancelledError) as e:
         errors.labels(type='health_check').inc()
         return {"status": "DOWN", "error": str(e)}, 503
