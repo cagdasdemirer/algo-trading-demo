@@ -18,9 +18,9 @@ async def publish_price_update(price: str):
 
 
 async def consume_price_updates(db: AsyncIOMotorDatabase, r: redis.Redis):
+    consumer = AIOKafkaConsumer('price_updates', bootstrap_servers=settings.kafka.bootstrap_servers)
+    await consumer.start()
     try:
-        consumer = AIOKafkaConsumer('price_updates', bootstrap_servers=settings.kafka.bootstrap_servers)
-        await consumer.start()
         async for msg in consumer:
             price = float(msg.value.decode())
             price_updates.labels(topic='price_updates').inc()
@@ -29,6 +29,9 @@ async def consume_price_updates(db: AsyncIOMotorDatabase, r: redis.Redis):
     except Exception as e:
         errors.labels(type='kafka_price_updates').inc()
         logger.error(f"Price update consumer failed: {e}")
+    finally:
+        await consumer.stop()  # Explicitly stop the consumer
+        logger.info("Kafka consumer price_updates stopped")
 
 
 async def publish_signal(signal: str):
@@ -39,9 +42,9 @@ async def publish_signal(signal: str):
 
 
 async def consume_signals(db: AsyncIOMotorDatabase):
+    consumer = AIOKafkaConsumer('signals', bootstrap_servers=settings.kafka.bootstrap_servers)
+    await consumer.start()
     try:
-        consumer = AIOKafkaConsumer('signals', bootstrap_servers=settings.kafka.bootstrap_servers)
-        await consumer.start()
         async for msg in consumer:
             signals.labels(topic='signals').inc()
             logger.info(f"Received signal: {msg.value.decode()}")
@@ -49,3 +52,6 @@ async def consume_signals(db: AsyncIOMotorDatabase):
     except Exception as e:
         errors.labels(type='kafka_signals').inc()
         logger.error(f"Signal consumer failed: {e}")
+    finally:
+        await consumer.stop()
+        logger.info("Kafka consumer signals stopped")
