@@ -26,8 +26,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
 
       # Binance-related environment variables
-      BINANCE_API_KEY: vnNWZLEptwDtbRuKqy2VzghdZh8TaT7Qo7HvEC51c46XFDNIZAEHWMqLg3wKCumy
-      BINANCE_SECRET_KEY: oK66Av5yqFgjjuG1tFMBzmDrfyCtNehC5jCnplhGrKi4PSHmnqMmeyPoEyzSQqB3
+      BINANCE_API_KEY:
+      BINANCE_SECRET_KEY:
       BINANCE_WEBSOCKET_STREAM: wss://stream.testnet.binance.vision:9443/ws/
 
       # Contact-related environment variables
